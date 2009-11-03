@@ -1,5 +1,4 @@
 # TODO
-# Show zero-width matches
 # Help / quick reference
 # Show captures
 
@@ -22,7 +21,7 @@ class ReggieFrame < Frame
     @text_styles = {
       :non_match => TextAttr.new( BLACK, WHITE, small_mono_font ),
       :match => TextAttr.new( BLACK, LIGHT_GREY, small_mono_font ),
-      :anchor_match => TextAttr.new( WHITE, BLACK, small_mono_font ),
+      :zero_width_match => TextAttr.new( WHITE, BLACK, small_mono_font ),
       :no_matches => TextAttr.new( RED, WHITE, small_mono_font )      
     }
     
@@ -86,8 +85,15 @@ class ReggieFrame < Frame
       num_matches += 1
       @results_ctrl.set_default_style @text_styles[:non_match]
       @results_ctrl.append_text( r[0..-s.matched_size-1] )
-      @results_ctrl.set_default_style @text_styles[:match]
-      @results_ctrl.append_text( s.matched.sub(begin_match_delimiter, "").sub(end_match_delimiter, "") )
+      
+      match = s.matched.sub(begin_match_delimiter, "").sub(end_match_delimiter, "")
+      if match.size > 0
+        @results_ctrl.set_default_style @text_styles[:match]
+        @results_ctrl.append_text( match )
+      else
+        @results_ctrl.set_default_style @text_styles[:zero_width_match]
+        @results_ctrl.append_text( " " )
+      end
     end
     
     if num_matches > 0      
