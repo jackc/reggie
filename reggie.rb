@@ -6,12 +6,34 @@ require 'wx'
 require 'strscan'
 include Wx
 
+REGEXP_OPTIONS = {
+  "i" => Regexp::IGNORECASE,
+  "x" => Regexp::EXTENDED,
+  "m" => Regexp::MULTILINE
+}
+
+class RegexpOptionsValidator < Validator
+  def initialize(*args)
+    super
+    evt_char :on_char
+  end
+  
+  def on_char(e)
+    valid_key_codes = [ K_BACK, K_DELETE, K_LEFT, K_RIGHT ] + (REGEXP_OPTIONS.keys - e.event_object.value.split("")).map { |k| k[0] }
+    if valid_key_codes.include?( e.key_code )
+      e.skip
+    else
+      bell        
+    end
+  end
+end
+
 class ReggieFrame < Frame
   
   def initialize(parent, options={})
     super
     # @panel = Panel.new(self) use panel for TAB_TRAVERSAL
-    
+
     create_status_bar
     set_status_text "ruby #{RUBY_VERSION} (#{RUBY_RELEASE_DATE} patchlevel #{RUBY_PATCHLEVEL}) [#{RUBY_PLATFORM}]"
     
@@ -25,18 +47,25 @@ class ReggieFrame < Frame
       :no_matches => TextAttr.new( RED, WHITE, small_mono_font )      
     }
     
-    @regex_ctrl_text = TextCtrl.new( self, :size => [540, 50], :style => TE_RICH )
+    @regex_ctrl_text = TextCtrl.new( self, :size => [600, 50], :style => TE_RICH )
     @regex_ctrl_text.set_default_style TextAttr.new( BLACK, WHITE, large_mono_font )
     evt_text @regex_ctrl_text, :on_regex_ctrl_text_changed
     
-    @test_string_ctrl_text = TextCtrl.new( self, :size => [355, 200], :style => TE_MULTILINE | TE_RICH )
+    @regex_options_ctrl_text = TextCtrl.new( self, :size => [100, 50], :style => TE_RICH, :validator => RegexpOptionsValidator.new )
+    @regex_options_ctrl_text.set_default_style TextAttr.new( BLACK, WHITE, large_mono_font )
+    evt_text @regex_options_ctrl_text, :on_regex_options_ctrl_text_changed
+    
+    @test_string_ctrl_text = TextCtrl.new( self, :size => [280, 200], :style => TE_MULTILINE | TE_RICH )
     @test_string_ctrl_text.set_default_style TextAttr.new( BLACK, WHITE, small_mono_font )
     evt_text @test_string_ctrl_text, :on_test_string_ctrl_text_changed
     
-    @results_ctrl = TextCtrl.new( self, :size => [355, 200], :style => TE_MULTILINE | TE_READONLY | TE_RICH )
+    @results_ctrl = TextCtrl.new( self, :size => [280, 200], :style => TE_MULTILINE | TE_READONLY | TE_RICH )
     
     box = BoxSizer.new(VERTICAL)
-    box.add( @regex_ctrl_text, 0, EXPAND | ALL, 10 )
+    regex_box = BoxSizer.new(HORIZONTAL)
+    regex_box.add( @regex_ctrl_text, 1, ALL, 10 )
+    regex_box.add( @regex_options_ctrl_text, 0, ALIGN_RIGHT | ALL, 10 )
+    box.add( regex_box, 0, EXPAND | ALL )
     
     box2 = BoxSizer.new(HORIZONTAL)
     box2.add( @test_string_ctrl_text, 1, EXPAND | ALL, 10 )
@@ -55,6 +84,10 @@ class ReggieFrame < Frame
     run_regex
   end
   
+  def on_regex_options_ctrl_text_changed(e)
+    run_regex
+  end
+  
   def run_regex
     @results_ctrl.clear
     
@@ -64,7 +97,15 @@ class ReggieFrame < Frame
       return
     end
     
-    regex = Regexp.new( @regex_ctrl_text.value ) rescue nil
+    regex_options = REGEXP_OPTIONS.inject(0) do |acc, e|
+      if @regex_options_ctrl_text.value.include?(e.first)
+        acc | e.last
+      else
+        acc
+      end
+    end
+    
+    regex = Regexp.new( @regex_ctrl_text.value, regex_options ) rescue nil
     unless regex
       @results_ctrl.set_default_style @text_styles[:no_matches]
       @results_ctrl.append_text "Invalid regex"    
